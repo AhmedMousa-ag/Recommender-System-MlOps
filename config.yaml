@@ -1,0 +1,8 @@
+directories:
+  pipline_path: "pip_line"
+  raw_data: "Data/Raw-Data"
+  prep_data: "Data/Prep-Data"
+  modules: "Modules"
+  serving_model: "Model_Serving"
+pipline:
+  name: 'rec_sys_imdb'
