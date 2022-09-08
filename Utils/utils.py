@@ -11,7 +11,7 @@ import yaml
 
 def create_pipline(pipeline_name, pipeline_root, data_root,
                    serving_model_dir, metadata_path,
-                   _train_module_file, _tuner_module_file, _transform_module_file,first_time_tuning=True):
+                   _train_module_file, _tuner_module_file, _transform_module_file, first_time_tuning=True):
     components = []  # Initiating empty list to append the components to it after creating eatch
 
     output = proto.Output(
@@ -39,26 +39,42 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
         module_file=_transform_module_file)
     components.append(transform)
 
-    # TODO put tuner here
-    tuner = tfx.components.Tuner(
-        module_file=_tuner_module_file,  # Contains `tuner_fn`.
-        examples=transform.outputs['transformed_examples'],
-        transform_graph=transform.outputs['transform_graph'],
-        train_args=trainer_pb2.TrainArgs(num_steps=20),
-        eval_args=trainer_pb2.EvalArgs(num_steps=5))
-    components.append(tuner)
+    if first_time_tuning:
+        tuner = tfx.components.Tuner(
+            module_file=_tuner_module_file,  # Contains `tuner_fn`.
+            examples=transform.outputs['transformed_examples'],
+            transform_graph=transform.outputs['transform_graph'],
+            train_args=trainer_pb2.TrainArgs(num_steps=20),
+            eval_args=trainer_pb2.EvalArgs(num_steps=5))
+        components.append(tuner)
 
-    trainer = tfx.components.Trainer(
-        module_file=_train_module_file,
-        examples=transform.outputs['transformed_examples'],
-        transform_graph=transform.outputs['transform_graph'],
-        hyperparameters=tuner.outputs['best_hyperparameters'],
-        schema=schema_gen.outputs['schema'],
-        train_args=tfx.proto.TrainArgs(num_steps=100),
-        eval_args=tfx.proto.EvalArgs(num_steps=5))
-    components.append(trainer)
+        trainer = tfx.components.Trainer(
+            module_file=_train_module_file,
+            examples=transform.outputs['transformed_examples'],
+            transform_graph=transform.outputs['transform_graph'],
+            hyperparameters=tuner.outputs['best_hyperparameters'],
+            schema=schema_gen.outputs['schema'],
+            train_args=tfx.proto.TrainArgs(num_steps=100),
+            eval_args=tfx.proto.EvalArgs(num_steps=5))
+        components.append(trainer)
+    else:
+        # TODO adjust it later
+        hparams_importer = ImporterNode(
+            instance_name='import_hparams',
+            # This can be Tuner's output file or manually edited file. The file contains
+            # text format of hyperparameters (kerastuner.HyperParameters.get_config())
+            source_uri='path/to/best_hyperparameters.txt',
+            artifact_type=HyperParameters)
 
-
+        trainer = tfx.components.Trainer(
+            module_file=_train_module_file,
+            examples=transform.outputs['transformed_examples'],
+            transform_graph=transform.outputs['transform_graph'],
+            hyperparameters=hparams_importer.outputs['result'],
+            schema=schema_gen.outputs['schema'],
+            train_args=tfx.proto.TrainArgs(num_steps=100),
+            eval_args=tfx.proto.EvalArgs(num_steps=5))
+        components.append(trainer)
 
     # TODO put model evaluation here
 
