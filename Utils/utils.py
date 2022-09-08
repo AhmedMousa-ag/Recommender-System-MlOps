@@ -125,6 +125,7 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
         model=trainer.outputs['model'],
         baseline_model=model_resolver.outputs['model'],
         eval_config=eval_config)
+    components.append(evaluator)
 
     # ------------------------------------End of model evaluation and model analysis-------------------------------
     pusher = tfx.components.Pusher(
