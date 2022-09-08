@@ -98,12 +98,12 @@ def run_fn(fn_args: tfx.components.FnArgs):
     train_dataset = _input_fn(
         fn_args.train_files,
         fn_args.data_accessor,
-        schema,
+        schema=fn_args.schema_file,
         batch_size=_TRAIN_BATCH_SIZE)
     eval_dataset = _input_fn(
         fn_args.eval_files,
         fn_args.data_accessor,
-        schema,
+        schema=fn_args.schema_file,
         batch_size=_EVAL_BATCH_SIZE)
 
     model = _build_keras_model()

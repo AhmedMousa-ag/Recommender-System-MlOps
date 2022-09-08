@@ -1,17 +1,32 @@
 import tfx
 from tfx.components import CsvExampleGen
 from tfx.components import StatisticsGen
-import os
+from tfx.dsl.components.common.importer import Importer
 from tfx.proto import example_gen_pb2
+from tfx.proto import trainer_pb2
+from tfx.types.standard_artifacts import HyperParameters
 from tfx.v1 import proto
 from tfx.orchestration.experimental.interactive.interactive_context import InteractiveContext
-import tensorflow as tf
-import yaml
+
 
 
 def create_pipline(pipeline_name, pipeline_root, data_root,
                    serving_model_dir, metadata_path,
-                   _train_module_file, _tuner_module_file, _transform_module_file, first_time_tuning=True):
+                   _train_module_file, _transform_module_file, _tuner_module_file=None, first_time_tuning=True,path_to_tuner_best_hyp=None):
+    """
+
+    :param pipeline_name: gives the pipleine name in folder to retrieve
+    :param pipeline_root: define the root folder of our pipeline
+    :param data_root: Our raw data which reads all csv files which will train our data
+    :param serving_model_dir: Where we want to export our best trained model
+    :param metadata_path: where to find the metadata for our pipleine
+    :param _train_module_file: the path to our training module which will train our model
+    :param _tuner_module_file: If using a tuner for the first time we have to tell our tuner where to find the instructions about what to tune
+    :param _transform_module_file: The path to our transform module to tell the transformer how to transform our data
+    :param first_time_tuning: A Boolean value if we are using a tuner or a hyperprameters from a previous tuned model
+    :param path_to_tuner_best_hyp: If using a pre-tuned model we will have to tell it where is our best hyper parameters .txt file.
+    :return: The pipline to run
+    """
     components = []  # Initiating empty list to append the components to it after creating eatch
 
     output = proto.Output(
@@ -59,11 +74,11 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
         components.append(trainer)
     else:
         # TODO adjust it later
-        hparams_importer = ImporterNode(
-            instance_name='import_hparams',
+        hparams_importer = Importer(
+            #instance_name='import_hparams',
             # This can be Tuner's output file or manually edited file. The file contains
             # text format of hyperparameters (kerastuner.HyperParameters.get_config())
-            source_uri='path/to/best_hyperparameters.txt',
+            source_uri=path_to_tuner_best_hyp,
             artifact_type=HyperParameters)
 
         trainer = tfx.components.Trainer(
