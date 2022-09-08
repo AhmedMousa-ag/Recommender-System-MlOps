@@ -1,7 +1,9 @@
 import yaml
 import os
 from Utils.utils import create_pipline
+import tfx
 
+print('TFX version: {}'.format(tfx.__version__))
 VERSION = "1"
 
 with open("config.yaml", "r") as fw:
