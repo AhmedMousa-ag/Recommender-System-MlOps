@@ -7,6 +7,7 @@ from tfx.proto import trainer_pb2
 from tfx.types.standard_artifacts import HyperParameters
 from tfx.v1 import proto
 from tfx.orchestration.experimental.interactive.interactive_context import InteractiveContext
+import tensorflow_model_analysis as tfma
 
 
 
@@ -48,9 +49,15 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
         infer_feature_shape=False)
     components.append(schema_gen)
 
+    example_validator = tfx.components.ExampleValidator(
+        statistics=statistics_gen.outputs['statistics'],
+        schema=schema_gen.outputs['schema'])
+    components.append(example_validator)
+
     transform = tfx.components.Transform(
         examples=example_gen.outputs['examples'],
         schema=schema_gen.outputs['schema'],
+        materialize=False,
         module_file=_transform_module_file)
     components.append(transform)
 
@@ -69,11 +76,10 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
             transform_graph=transform.outputs['transform_graph'],
             hyperparameters=tuner.outputs['best_hyperparameters'],
             schema=schema_gen.outputs['schema'],
-            train_args=tfx.proto.TrainArgs(num_steps=100),
-            eval_args=tfx.proto.EvalArgs(num_steps=5))
+            train_args=trainer_pb2.TrainArgs(num_steps=100),
+            eval_args=trainer_pb2.EvalArgs(num_steps=5))
         components.append(trainer)
     else:
-        # TODO adjust it later
         hparams_importer = Importer(
             #instance_name='import_hparams',
             # This can be Tuner's output file or manually edited file. The file contains
@@ -87,11 +93,12 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
             transform_graph=transform.outputs['transform_graph'],
             hyperparameters=hparams_importer.outputs['result'],
             schema=schema_gen.outputs['schema'],
-            train_args=tfx.proto.TrainArgs(num_steps=100),
-            eval_args=tfx.proto.EvalArgs(num_steps=5))
+            train_args=trainer_pb2.TrainArgs(num_steps=100),
+            eval_args=trainer_pb2.EvalArgs(num_steps=5))
         components.append(trainer)
 
     # TODO put model evaluation here
+
 
     pusher = tfx.components.Pusher(
         model=trainer.outputs['model'],
