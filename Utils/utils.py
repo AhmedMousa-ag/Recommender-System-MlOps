@@ -6,7 +6,7 @@ from tfx.types.standard_artifacts import HyperParameters
 from tfx.v1 import proto
 import tensorflow_model_analysis as tfma
 
-_LABEL_KEY = 'My Rate'
+_LABEL_KEY = 'My Rate'  # TODO check the label for model analysis
 
 
 def create_pipline(pipeline_name, pipeline_root, data_root,
@@ -57,7 +57,6 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
     transform = tfx.components.Transform(
         examples=example_gen.outputs['examples'],
         schema=schema_gen.outputs['schema'],
-        materialize=False,
         module_file=_transform_module_file)
     components.append(transform)
 
@@ -118,6 +117,7 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
             # Calculate metrics for each penguin species.
             tfma.SlicingSpec(feature_keys=[_LABEL_KEY]),
         ],
+
     )
 
     evaluator = tfx.components.Evaluator(
