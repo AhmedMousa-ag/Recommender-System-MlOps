@@ -1,4 +1,0 @@
-feature {
-  name: "IMDb Rating"
-  type: FLOAT
-}
