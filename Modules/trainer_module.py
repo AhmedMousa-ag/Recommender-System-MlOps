@@ -41,7 +41,7 @@ def _input_fn(file_pattern: List[str],
 
 
 def _build_uni_embedding(uri="https://tfhub.dev/google/universal-sentence-encoder/4"):
-    return hub.load(uri)
+    return hub.KerasLayer(uri, trainable=False)
 
 
 """
@@ -53,26 +53,38 @@ The model will consist of:
 """
 
 
-def _build_keras_model() -> tf.keras.Model:
+def _build_keras_model(hp) -> tf.keras.Model:
     """Creates a DNN Keras model for classifying penguin data.
     Returns:
       A Keras Model.
     """
+    hp_units = hp.get('units')
+    activations_choices = hp.get('activation')
+
     embedding_model = _build_uni_embedding()
-    inputs = [keras.layers.Input(shape=(1,), name=f) for f in _FEATURE_KEYS]
-    embeddings = [embedding_model(inp) for inp in inputs[:-1]]  # -1 because the last input layer is for IMDB Rating
-    bidir_layers = [tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(64, activation='relu'))(embed)
-                    for embed in embeddings]
+    embedding_model = _build_uni_embedding()
+    inputs = [keras.layers.Input(shape=[], dtype=tf.string, name=f) for f in _FEATURE_KEYS]
+    rating_inp = keras.layers.Input(shape=[1, ], dtype=tf.string, name='input_rating')
+    embeddings = [embedding_model(inp) for inp in inputs[:-1]]
+    embeddings = [tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, -1))(embed) for embed in embeddings]
+    bidir_layers = [
+        tf.keras.layers.Bidirectional(
+            tf.keras.layers.GRU(hp_units, activation=activations_choices, return_sequences=True))(embed)
+        for embed in embeddings]
     x = tf.keras.layers.concatenate(bidir_layers)
-    x = tf.keras.layers.Dense(64, activation='relu')(x)
-    # Time to deal with the last input layer
-    rating_layer = tf.keras.layers.Dense(64, activation='relu')(inputs[-1])  # Remember the last input was for rating
-    x = tf.keras.layers.concatenate(x, [rating_layer])
+    x = tf.keras.layers.Dense(hp_units, activation=activations_choices)(x)
+    rating_layer = tf.keras.layers.Dense(hp_units, activation=activations_choices)(rating_inp)
+    rating_layer = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, 0))(rating_layer)
+    x = tf.keras.layers.concatenate([x, rating_layer])
     outputs = keras.layers.Dense(1)(x)
-    model = keras.Model(inputs=inputs, outputs=outputs)
+    model = keras.Model(inputs=(inputs, rating_inp), outputs=outputs)
+
+    # Tune the learning rate for the optimizer
+    # Choose an optimal value from 0.01, 0.001, or 0.0001
+    hp_learning_rate = hp.get('learning_rate')
 
     model.compile(
-        optimizer=keras.optimizers.Adam(),
+        optimizer=keras.optimizers.Adam(learning_rate=hp_learning_rate),
         loss=tf.keras.losses.MeanAbsoluteError(),
         metrics=[keras.metrics.MeanSquaredError()])
 
