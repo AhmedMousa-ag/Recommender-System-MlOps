@@ -53,7 +53,6 @@ def _input_fn(file_pattern,
       A dataset of dict elements, (or a tuple of dict elements and label).
       Each dict maps feature keys to Tensor or SparseTensor objects.
     """
-
     # Get feature specification based on transform output
     transformed_feature_spec = (
         tf_transform_output.transformed_feature_spec().copy())
@@ -87,8 +86,7 @@ def model_builder(hp):
     """
 
     _FEATURE_KEYS = [
-        'Title', 'Description', 'IMDb Rating'
-    ]
+        'Title', 'Description','IMDb Rating']
     # Tune the number of units in the first Dense layer
     # Choose an optimal value between 32-512
 
@@ -96,13 +94,16 @@ def model_builder(hp):
     activations_choices = hp.Choice('activation', values=['relu', 'selu'])
 
 
-    inputs = [keras.layers.Input(shape=[], dtype=tf.string, name=f) for f in _FEATURE_KEYS]
-    rating_inp = keras.layers.Input(shape=[1, ], dtype=tf.string, name='input_rating')
+    input_title = keras.layers.Input(shape=[], dtype=tf.string, name="Title")
+    input_desc = keras.layers.Input(shape=[], dtype=tf.string, name="Description")
+
+    input_rating = keras.layers.Input(shape=[1,], name='IMDb_Rating')
 
     embed_title = _build_uni_embedding()
     embed_desc = _build_uni_embedding()
-    embed_title = embed_title(inputs[0])
-    embed_desc = embed_desc(inputs[0])
+
+    embed_title = embed_title(input_title)
+    embed_desc = embed_desc(input_desc)
     embeddings = [embed_title,embed_desc]
 
     embeddings = [tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, -1))(embed) for embed in embeddings]
@@ -112,11 +113,13 @@ def model_builder(hp):
         for embed in embeddings]
     x = tf.keras.layers.concatenate(bidir_layers)
     x = tf.keras.layers.Dense(64, activation=activations_choices)(x)
-    rating_layer = tf.keras.layers.Dense(64, activation=activations_choices)(rating_inp)
+
+    rating_layer = tf.keras.layers.Dense(64, activation=activations_choices)(input_rating)
     rating_layer = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, 0))(rating_layer)
     x = tf.keras.layers.concatenate([x, rating_layer])
     outputs = keras.layers.Dense(1)(x)
-    model = keras.Model(inputs=(inputs, rating_inp), outputs=outputs)
+
+    model = keras.Model(inputs=[input_title,input_desc,input_rating], outputs=outputs)
 
     # Tune the learning rate for the optimizer
     # Choose an optimal value from 0.01, 0.001, or 0.0001
