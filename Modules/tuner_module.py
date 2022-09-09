@@ -93,20 +93,26 @@ def model_builder(hp):
     # Choose an optimal value between 32-512
 
     hp_units = hp.Int('units', min_value=32, max_value=512, step=32)
-    activations_choices = hp.Choice('activation', values=['relu', 'selu', None])
+    activations_choices = hp.Choice('activation', values=['relu', 'selu'])
 
-    embedding_model = _build_uni_embedding()
+
     inputs = [keras.layers.Input(shape=[], dtype=tf.string, name=f) for f in _FEATURE_KEYS]
     rating_inp = keras.layers.Input(shape=[1, ], dtype=tf.string, name='input_rating')
-    embeddings = [embedding_model(inp) for inp in inputs[:-1]]
+
+    embed_title = _build_uni_embedding()
+    embed_desc = _build_uni_embedding()
+    embed_title = embed_title(inputs[0])
+    embed_desc = embed_desc(inputs[0])
+    embeddings = [embed_title,embed_desc]
+
     embeddings = [tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, -1))(embed) for embed in embeddings]
     bidir_layers = [
         tf.keras.layers.Bidirectional(
             tf.keras.layers.GRU(hp_units, activation=activations_choices, return_sequences=True))(embed)
         for embed in embeddings]
     x = tf.keras.layers.concatenate(bidir_layers)
-    x = tf.keras.layers.Dense(hp_units, activation=activations_choices)(x)
-    rating_layer = tf.keras.layers.Dense(hp_units, activation=activations_choices)(rating_inp)
+    x = tf.keras.layers.Dense(64, activation=activations_choices)(x)
+    rating_layer = tf.keras.layers.Dense(64, activation=activations_choices)(rating_inp)
     rating_layer = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, 0))(rating_layer)
     x = tf.keras.layers.concatenate([x, rating_layer])
     outputs = keras.layers.Dense(1)(x)
@@ -156,7 +162,6 @@ def tuner_fn(fn_args: FnArgs) -> TunerFnResult:
     # Use _input_fn() to extract input features and labels from the train and val set
     train_set = _input_fn(fn_args.train_files[0], tf_transform_output)
     val_set = _input_fn(fn_args.eval_files[0], tf_transform_output)
-
     return TunerFnResult(
         tuner=tuner,
         fit_kwargs={

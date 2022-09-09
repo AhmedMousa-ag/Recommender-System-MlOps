@@ -123,7 +123,7 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
     evaluator = tfx.components.Evaluator(
         examples=example_gen.outputs['examples'],
         model=trainer.outputs['model'],
-        baseline_model=model_resolver.outputs['model'],
+       # baseline_model=model_resolver.outputs['model'],
         eval_config=eval_config)
     components.append(evaluator)
 
