@@ -1,0 +1,8 @@
+feature {
+  name: "IMDb Rating"
+  type: FLOAT
+}
+feature {
+  name: "My Rate"
+  type: FLOAT
+}
