@@ -59,22 +59,26 @@ def _build_keras_model(hp) -> tf.keras.Model:
       A Keras Model.
     """
 
+    hp_units = hp.get("units")
+    activations_choices = hp.get("activation")
+    hp_learning_rate = hp.get("learning_rate")
 
-    input_desc = keras.layers.Input(shape=[], dtype=tf.string, name="Description")
-    input_rating = keras.layers.Input(shape=[1, ], name='IMDb Rating')
 
-    embed_desc = _build_uni_embedding()
+    input_desc = keras.layers.Input(shape=[1, ], dtype=tf.float32,
+                                    name="Description")  # Input layer names must be the same as the feature names
 
-    embed_desc = embed_desc(input_desc)
+    input_rating = keras.layers.Input(shape=[1, ], dtype=tf.float32,
+                                      name='IMDb Rating')  # Input layer names must be the same as the feature names
 
-    embeddings = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, -1))(embed_desc)
+    embed_desc = keras.layers.Embedding(input_dim=6000, output_dim=124, mask_zero=True)(input_desc)
     bidir_layers = tf.keras.layers.Bidirectional(
-        tf.keras.layers.GRU(64, activation='relu', return_sequences=True))(embeddings)
+        tf.keras.layers.GRU(hp_units, activation=activations_choices, return_sequences=True))(embed_desc)
 
-    x = tf.keras.layers.Dense(64, activation='relu')(bidir_layers)
+    x = tf.keras.layers.Dense(64, activation=activations_choices)(bidir_layers)
+    x = tf.keras.layers.Flatten()(x)
 
-    rating_layer = tf.keras.layers.Dense(64, activation='relu')(input_rating)
-    rating_layer = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, 0))(rating_layer)
+    rating_layer = tf.keras.layers.Dense(64, activation=activations_choices)(input_rating)
+    rating_layer = tf.keras.layers.Flatten()(rating_layer)
     x = tf.keras.layers.concatenate([x, rating_layer])
     outputs = keras.layers.Dense(1)(x)
 
@@ -83,10 +87,9 @@ def _build_keras_model(hp) -> tf.keras.Model:
     # Tune the learning rate for the optimizer
     # Choose an optimal value from 0.01, 0.001, or 0.0001
 
-    model.compile(
-        optimizer=keras.optimizers.Adam(learning_rate=0.01),
-        loss=tf.keras.losses.MeanAbsoluteError(),
-        metrics=[keras.metrics.MeanSquaredError()])
+    model.compile(optimizer=keras.optimizers.Adam(learning_rate=hp_learning_rate),
+                  loss=keras.losses.MeanSquaredError(),
+                  metrics=[keras.metrics.MeanAbsoluteError()])
 
     model.summary(print_fn=logging.info)
     return model

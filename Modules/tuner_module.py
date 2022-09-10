@@ -93,19 +93,14 @@ def model_builder(hp):
     hp_units = hp.Int('units', min_value=32, max_value=512, step=32)
     activations_choices = hp.Choice('activation', values=['relu', 'selu'])
 
-    # embed_desc = _build_uni_embedding()
 
-    # arbitary_input = keras.layers.Input(shape=[])
     input_desc = keras.layers.Input(shape=[1, ], dtype=tf.float32,
                                     name="Description")  # Input layer names must be the same as the feature names
-    #z = keras.layers.Lambda(lambda x: tf.expand_dims(x,axis=0))(input_desc)
 
     input_rating = keras.layers.Input(shape=[1, ], dtype=tf.float32,
                                       name='IMDb Rating')  # Input layer names must be the same as the feature names
 
-    # embed_desc = embed_desc(z)
     embed_desc = keras.layers.Embedding(input_dim=6000, output_dim=124,mask_zero=True)(input_desc)
-    #embeddings = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, -1))(embed_desc)
     bidir_layers = tf.keras.layers.Bidirectional(
         tf.keras.layers.GRU(hp_units, activation=activations_choices, return_sequences=True))(embed_desc)
 
@@ -124,8 +119,8 @@ def model_builder(hp):
     hp_learning_rate = hp.Choice('learning_rate', values=[1e-2, 1e-3, 1e-4])
 
     model.compile(optimizer=keras.optimizers.Adam(learning_rate=hp_learning_rate),
-                  loss=keras.losses.MeanAbsoluteError(),
-                  metrics=[keras.metrics.MeanSquaredError()])
+                  loss=keras.losses.MeanSquaredError(),
+                  metrics=[keras.metrics.MeanAbsoluteError()])
 
     return model
 
@@ -151,7 +146,7 @@ def tuner_fn(fn_args: FnArgs) -> TunerFnResult:
     """
     # Define tuner search strategy
     tuner = kt.Hyperband(model_builder,
-                         objective='val_accuracy',
+                         objective='val_mean_absolute_error',
                          max_epochs=10,
                          factor=3,
                          directory=fn_args.working_dir,
