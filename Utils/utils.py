@@ -3,11 +3,12 @@ from tfx import v1 as tfx  # It's a bit tricky but you have to import tfx from v
 from tfx.components import CsvExampleGen, StatisticsGen
 from tfx.dsl.components.common.importer import Importer
 from tfx.proto import example_gen_pb2, trainer_pb2
-from tfx.types.standard_artifacts import HyperParameters
+
+from tfx.v1.types.standard_artifacts import HyperParameters
 from tfx.v1 import proto
 import tensorflow_model_analysis as tfma
 
-_LABEL_KEY = 'My Rate'  # TODO check the label for model analysis
+_LABEL_KEY = 'My Rate'
 
 
 def create_pipline(pipeline_name, pipeline_root, data_root,
@@ -59,8 +60,8 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
     transform = tfx.components.Transform(
         examples=example_gen.outputs['examples'],
         schema=schema_gen.outputs['schema'],
-        #splits_config=proto.SplitsConfig(analyze=['train'],
-                                #         transform=['train', 'eval','test']),
+        # splits_config=proto.SplitsConfig(analyze=['train'],
+        #         transform=['train', 'eval','test']),
         module_file=_transform_module_file)
     components.append(transform)
 
@@ -70,8 +71,8 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
             examples=transform.outputs['transformed_examples'],
             transform_graph=transform.outputs['transform_graph'],
             schema=schema_gen.outputs['schema'],
-            train_args=trainer_pb2.TrainArgs(splits=['train'],num_steps=20),
-            eval_args=trainer_pb2.EvalArgs(splits=['eval'],num_steps=5))
+            train_args=trainer_pb2.TrainArgs(splits=['train'], num_steps=20),
+            eval_args=trainer_pb2.EvalArgs(splits=['eval'], num_steps=5))
         components.append(tuner)
 
         trainer = tfx.components.Trainer(
@@ -85,11 +86,11 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
         components.append(trainer)
     else:
         hparams_importer = Importer(
-            # instance_name='import_hparams',
             # This can be Tuner's output file or manually edited file. The file contains
-            # text format of hyperparameters (kerastuner.HyperParameters.get_config())
+            # text format of hyperparameters (keras_tuner.HyperParameters.get_config())
             source_uri=path_to_tuner_best_hyp,
-            artifact_type=HyperParameters)
+            artifact_type=HyperParameters,
+        ).with_id('import_hparams')
 
         trainer = tfx.components.Trainer(
             module_file=_train_module_file,
@@ -126,7 +127,7 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
     )
 
     evaluator = tfx.components.Evaluator(
-        examples=example_gen.outputs['examples'],
+        examples=transform.outputs['transformed_examples'],
         model=trainer.outputs['model'],
         # baseline_model=model_resolver.outputs['model'],
         eval_config=eval_config)

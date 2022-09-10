@@ -27,6 +27,9 @@ my_list.describe()
 len(my_list["Description"].unique())
 
 prep_data = my_list.dropna()
+prep_data["IMDb_Rating"] = prep_data["IMDb Rating"]
+prep_data = prep_data.drop(["IMDb Rating"],axis=1) # Spaces are not allowed in model's layer names That's why We have to rename it
+print(prep_data.head())
 #prep_data["Description"][prep_data["Description"]==type(float)]
 '''import numpy as np
 prep_data["Description"] = np.array(prep_data["Description"],dtype=str)'''

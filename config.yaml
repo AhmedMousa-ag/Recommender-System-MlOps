@@ -4,5 +4,8 @@ directories:
   prep_data: "Data/Prep-Data"
   modules: "Modules"
   serving_model: "Model_Serving"
+  tun_best_param: "Tuner/best_hyperparameters/827/best_hyperparameters.txt"
 pipline:
   name: 'rec_sys_imdb'
+
+

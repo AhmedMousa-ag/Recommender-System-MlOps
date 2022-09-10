@@ -16,10 +16,11 @@ TRANSFORM_MODULE = os.path.join(config_file["directories"]["modules"], "transfor
 TRAINER_MODULE = os.path.join(config_file["directories"]["modules"], "trainer_module.py")
 TUNER_MODULE = os.path.join(config_file["directories"]["modules"], "tuner_module.py")
 DATA_ROOT = config_file["directories"]["prep_data"]
-
+TUN_BEST_PARAM_ROOT = os.path.join(PIPLINE_ROOT,config_file["directories"]["tun_best_param"])
+print(TUN_BEST_PARAM_ROOT)
 print("Will initiate pipline.......")
 pipline = create_pipline(PIPLINE_NAME, PIPLINE_ROOT, DATA_ROOT, SERVING_MODEL_DIR, METADATA_PATH, TRAINER_MODULE,
-                         TRANSFORM_MODULE, TUNER_MODULE)
+                         TRANSFORM_MODULE, TUNER_MODULE,first_time_tuning=True,path_to_tuner_best_hyp=TUN_BEST_PARAM_ROOT)
 print("Finished creating pipline.......")
 
 print("Will run the pipline........")

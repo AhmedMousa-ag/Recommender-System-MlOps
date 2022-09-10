@@ -93,14 +93,13 @@ def model_builder(hp):
     hp_units = hp.Int('units', min_value=32, max_value=512, step=32)
     activations_choices = hp.Choice('activation', values=['relu', 'selu'])
 
-
     input_desc = keras.layers.Input(shape=[1, ], dtype=tf.float32,
                                     name="Description")  # Input layer names must be the same as the feature names
 
     input_rating = keras.layers.Input(shape=[1, ], dtype=tf.float32,
-                                      name='IMDb Rating')  # Input layer names must be the same as the feature names
+                                      name='IMDb_Rating')  # Input layer names must be the same as the feature names
 
-    embed_desc = keras.layers.Embedding(input_dim=6000, output_dim=124,mask_zero=True)(input_desc)
+    embed_desc = keras.layers.Embedding(input_dim=6000, output_dim=124, mask_zero=True)(input_desc)
     bidir_layers = tf.keras.layers.Bidirectional(
         tf.keras.layers.GRU(hp_units, activation=activations_choices, return_sequences=True))(embed_desc)
 
@@ -158,6 +157,7 @@ def tuner_fn(fn_args: FnArgs) -> TunerFnResult:
     # Use _input_fn() to extract input features and labels from the train and val set
     train_set = _input_fn(fn_args.train_files[0], tf_transform_output)
     val_set = _input_fn(fn_args.eval_files[0], tf_transform_output)
+
     return TunerFnResult(
         tuner=tuner,
         fit_kwargs={

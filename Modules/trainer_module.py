@@ -6,38 +6,56 @@ import tensorflow_hub as hub
 from tfx import v1 as tfx
 from tfx_bsl.public import tfxio
 from tensorflow_metadata.proto.v0 import schema_pb2
+import tensorflow_transform as tft
 
-_FEATURE_KEYS = [
-    'Title', 'Description', 'IMDb Rating'
-]
-
-_LABEL_KEY = 'My Rate'
+_LABEL_KEY = 'My Rate'  # TODO make it in config file
 _TRAIN_BATCH_SIZE = 20
 _EVAL_BATCH_SIZE = 10
 
 
-def _input_fn(file_pattern: List[str],
-              data_accessor: tfx.components.DataAccessor,
-              schema: schema_pb2.Schema,
-              batch_size: int = 200) -> tf.data.Dataset:
-    """Generates features and label for training.
+def _gzip_reader_fn(filenames):
+    '''Load compressed dataset
 
     Args:
-      file_pattern: List of paths or patterns of input tfrecord files.
-      data_accessor: DataAccessor for converting input to RecordBatch.
-      schema: schema of the input data.
-      batch_size: representing the number of consecutive elements of returned
-        dataset to combine in a single batch
+      filenames - filenames of TFRecords to load
 
     Returns:
-      A dataset that contains (features, indices) tuple where features is a
-        dictionary of Tensors, and indices is a single Tensor of label indices.
-    """
-    return data_accessor.tf_dataset_factory(
-        file_pattern,
-        tfxio.TensorFlowDatasetOptions(
-            batch_size=batch_size, label_key=_LABEL_KEY),
-        schema=schema).repeat()
+      TFRecordDataset loaded from the filenames
+    '''
+
+    # Load the dataset. Specify the compression type since it is saved as `.gz`
+    return tf.data.TFRecordDataset(filenames, compression_type='GZIP')
+
+
+def _input_fn(file_pattern,
+              tf_transform_output,
+              num_epochs=None,
+              batch_size=32) -> tf.data.Dataset:
+    '''Create batches of features and labels from TF Records
+
+    Args:
+      file_pattern - List of files or patterns of file paths containing Example records.
+      tf_transform_output - transform output graph
+      num_epochs - Integer specifying the number of times to read through the dataset.
+              If None, cycles through the dataset forever.
+      batch_size - An int representing the number of records to combine in a single batch.
+
+    Returns:
+      A dataset of dict elements, (or a tuple of dict elements and label).
+      Each dict maps feature keys to Tensor or SparseTensor objects.
+    '''
+    transformed_feature_spec = (
+        tf_transform_output.transformed_feature_spec().copy())
+
+    dataset = tf.data.experimental.make_batched_features_dataset(
+        file_pattern=file_pattern,
+        batch_size=batch_size,
+        features=transformed_feature_spec,
+        reader=_gzip_reader_fn,
+        num_epochs=num_epochs,
+        label_key=_LABEL_KEY)
+
+    return dataset
 
 
 def _build_uni_embedding(uri="https://tfhub.dev/google/universal-sentence-encoder/4"):
@@ -63,12 +81,11 @@ def _build_keras_model(hp) -> tf.keras.Model:
     activations_choices = hp.get("activation")
     hp_learning_rate = hp.get("learning_rate")
 
-
     input_desc = keras.layers.Input(shape=[1, ], dtype=tf.float32,
                                     name="Description")  # Input layer names must be the same as the feature names
 
     input_rating = keras.layers.Input(shape=[1, ], dtype=tf.float32,
-                                      name='IMDb Rating')  # Input layer names must be the same as the feature names
+                                      name='IMDb_Rating')  # Input layer names must be the same as the feature names
 
     embed_desc = keras.layers.Embedding(input_dim=6000, output_dim=124, mask_zero=True)(input_desc)
     bidir_layers = tf.keras.layers.Bidirectional(
@@ -107,26 +124,26 @@ def run_fn(fn_args: tfx.components.FnArgs):
     # `schema_from_feature_spec` could be used to generate schema from very simple
     # feature_spec, but the schema returned would be very primitive.
 
-    # TODO see how to replace it with our generated schema
-    # schema = schema_utils.schema_from_feature_spec(_FEATURE_SPEC)
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(
+        log_dir=fn_args.model_run_dir, update_freq='batch')
 
-    train_dataset = _input_fn(
-        fn_args.train_files,
-        fn_args.data_accessor,
-        schema=fn_args.schema_file,
-        batch_size=_TRAIN_BATCH_SIZE)
-    eval_dataset = _input_fn(
-        fn_args.eval_files,
-        fn_args.data_accessor,
-        schema=fn_args.schema_file,
-        batch_size=_EVAL_BATCH_SIZE)
+    early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
 
-    model = _build_keras_model()
+    tf_transform_output = tft.TFTransformOutput(fn_args.transform_graph_path)
+
+    # Use _input_fn() to extract input features and labels from the train and val set
+    epochs = 50  # Define our epochs here #TODO move it to config file
+    train_dataset = _input_fn(fn_args.train_files[0], tf_transform_output, epochs)
+    eval_dataset = _input_fn(fn_args.eval_files[0], tf_transform_output, epochs)
+
+    hp = fn_args.hyperparameters.get('values')
+    model = _build_keras_model(hp=hp)
     model.fit(
         train_dataset,
         steps_per_epoch=fn_args.train_steps,
         validation_data=eval_dataset,
-        validation_steps=fn_args.eval_steps)
+        validation_steps=fn_args.eval_steps,
+        callbacks=[tensorboard_callback, early_stop_callback])
 
     # The result of the training should be saved in `fn_args.serving_model_dir`
     # directory.
