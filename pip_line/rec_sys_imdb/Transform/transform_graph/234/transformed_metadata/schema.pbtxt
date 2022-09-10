@@ -1,0 +1,22 @@
+feature {
+  name: "Description"
+  type: BYTES
+}
+feature {
+  name: "IMDb Rating"
+  type: FLOAT
+  presence {
+    min_fraction: 1.0
+  }
+  shape {
+  }
+}
+feature {
+  name: "My Rate"
+  type: FLOAT
+  presence {
+    min_fraction: 1.0
+  }
+  shape {
+  }
+}

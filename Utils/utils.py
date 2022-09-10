@@ -1,3 +1,4 @@
+import tfx.types.standard_artifacts
 from tfx import v1 as tfx  # It's a bit tricky but you have to import tfx from v1
 from tfx.components import CsvExampleGen, StatisticsGen
 from tfx.dsl.components.common.importer import Importer
@@ -46,7 +47,8 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
 
     schema_gen = tfx.components.SchemaGen(
         statistics=statistics_gen.outputs['statistics'],
-        infer_feature_shape=False)
+        infer_feature_shape=True)
+
     components.append(schema_gen)
 
     example_validator = tfx.components.ExampleValidator(
@@ -57,6 +59,8 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
     transform = tfx.components.Transform(
         examples=example_gen.outputs['examples'],
         schema=schema_gen.outputs['schema'],
+        #splits_config=proto.SplitsConfig(analyze=['train'],
+                                #         transform=['train', 'eval','test']),
         module_file=_transform_module_file)
     components.append(transform)
 
@@ -65,8 +69,9 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
             module_file=_tuner_module_file,  # Contains `tuner_fn`.
             examples=transform.outputs['transformed_examples'],
             transform_graph=transform.outputs['transform_graph'],
-            train_args=trainer_pb2.TrainArgs(num_steps=20),
-            eval_args=trainer_pb2.EvalArgs(num_steps=5))
+            schema=schema_gen.outputs['schema'],
+            train_args=trainer_pb2.TrainArgs(splits=['train'],num_steps=20),
+            eval_args=trainer_pb2.EvalArgs(splits=['eval'],num_steps=5))
         components.append(tuner)
 
         trainer = tfx.components.Trainer(
@@ -75,8 +80,8 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
             transform_graph=transform.outputs['transform_graph'],
             hyperparameters=tuner.outputs['best_hyperparameters'],
             schema=schema_gen.outputs['schema'],
-            train_args=trainer_pb2.TrainArgs(num_steps=100),
-            eval_args=trainer_pb2.EvalArgs(num_steps=5))
+            train_args=trainer_pb2.TrainArgs(splits=['train'], num_steps=20),
+            eval_args=trainer_pb2.EvalArgs(splits=['eval'], num_steps=5))
         components.append(trainer)
     else:
         hparams_importer = Importer(
@@ -123,7 +128,7 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
     evaluator = tfx.components.Evaluator(
         examples=example_gen.outputs['examples'],
         model=trainer.outputs['model'],
-       # baseline_model=model_resolver.outputs['model'],
+        # baseline_model=model_resolver.outputs['model'],
         eval_config=eval_config)
     components.append(evaluator)
 

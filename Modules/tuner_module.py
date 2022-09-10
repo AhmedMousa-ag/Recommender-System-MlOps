@@ -39,7 +39,7 @@ def _gzip_reader_fn(filenames):
 def _input_fn(file_pattern,
               tf_transform_output,
               num_epochs=None,
-              batch_size=32) -> tf.data.Dataset:
+              batch_size=6) -> tf.data.Dataset:
     """Create batches of features and labels from TF Records
 
     Args:
@@ -86,40 +86,38 @@ def model_builder(hp):
     """
 
     _FEATURE_KEYS = [
-        'Title', 'Description','IMDb Rating']
+        'Description', 'IMDb Rating']
     # Tune the number of units in the first Dense layer
     # Choose an optimal value between 32-512
 
     hp_units = hp.Int('units', min_value=32, max_value=512, step=32)
     activations_choices = hp.Choice('activation', values=['relu', 'selu'])
 
+    # embed_desc = _build_uni_embedding()
 
-    input_title = keras.layers.Input(shape=[], dtype=tf.string, name="Title")
-    input_desc = keras.layers.Input(shape=[], dtype=tf.string, name="Description")
+    # arbitary_input = keras.layers.Input(shape=[])
+    input_desc = keras.layers.Input(shape=[1, ], dtype=tf.float32,
+                                    name="Description")  # Input layer names must be the same as the feature names
+    #z = keras.layers.Lambda(lambda x: tf.expand_dims(x,axis=0))(input_desc)
 
-    input_rating = keras.layers.Input(shape=[1,], name='IMDb_Rating')
+    input_rating = keras.layers.Input(shape=[1, ], dtype=tf.float32,
+                                      name='IMDb Rating')  # Input layer names must be the same as the feature names
 
-    embed_title = _build_uni_embedding()
-    embed_desc = _build_uni_embedding()
+    # embed_desc = embed_desc(z)
+    embed_desc = keras.layers.Embedding(input_dim=6000, output_dim=124,mask_zero=True)(input_desc)
+    #embeddings = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, -1))(embed_desc)
+    bidir_layers = tf.keras.layers.Bidirectional(
+        tf.keras.layers.GRU(hp_units, activation=activations_choices, return_sequences=True))(embed_desc)
 
-    embed_title = embed_title(input_title)
-    embed_desc = embed_desc(input_desc)
-    embeddings = [embed_title,embed_desc]
-
-    embeddings = [tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, -1))(embed) for embed in embeddings]
-    bidir_layers = [
-        tf.keras.layers.Bidirectional(
-            tf.keras.layers.GRU(hp_units, activation=activations_choices, return_sequences=True))(embed)
-        for embed in embeddings]
-    x = tf.keras.layers.concatenate(bidir_layers)
-    x = tf.keras.layers.Dense(64, activation=activations_choices)(x)
+    x = tf.keras.layers.Dense(64, activation=activations_choices)(bidir_layers)
+    x = tf.keras.layers.Flatten()(x)
 
     rating_layer = tf.keras.layers.Dense(64, activation=activations_choices)(input_rating)
-    rating_layer = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, 0))(rating_layer)
+    rating_layer = tf.keras.layers.Flatten()(rating_layer)
     x = tf.keras.layers.concatenate([x, rating_layer])
     outputs = keras.layers.Dense(1)(x)
 
-    model = keras.Model(inputs=[input_title,input_desc,input_rating], outputs=outputs)
+    model = keras.Model(inputs=[input_desc, input_rating], outputs=outputs)
 
     # Tune the learning rate for the optimizer
     # Choose an optimal value from 0.01, 0.001, or 0.0001

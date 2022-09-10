@@ -58,39 +58,33 @@ def _build_keras_model(hp) -> tf.keras.Model:
     Returns:
       A Keras Model.
     """
-    hp_units = hp.get('units')
-    activations_choices = hp.get('activation')
 
-    input_title = keras.layers.Input(shape=[], dtype=tf.string, name="title_input")
-    input_desc = keras.layers.Input(shape=[], dtype=tf.string, name="desc_input")
 
-    rating_inp = keras.layers.Input(shape=[1, ], name='input_rating')
+    input_desc = keras.layers.Input(shape=[], dtype=tf.string, name="Description")
+    input_rating = keras.layers.Input(shape=[1, ], name='IMDb Rating')
 
-    embed_title = _build_uni_embedding()
     embed_desc = _build_uni_embedding()
-    embed_title = embed_title(input_title)
-    embed_desc = embed_desc(input_desc)
-    embeddings = [embed_title, embed_desc]
 
-    embeddings = [tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, -1))(embed) for embed in embeddings]
-    bidir_layers = [
-        tf.keras.layers.Bidirectional(
-            tf.keras.layers.GRU(hp_units, activation=activations_choices, return_sequences=True))(embed)
-        for embed in embeddings]
-    x = tf.keras.layers.concatenate(bidir_layers)
-    x = tf.keras.layers.Dense(64, activation=activations_choices)(x)
-    rating_layer = tf.keras.layers.Dense(64, activation=activations_choices)(rating_inp)
+    embed_desc = embed_desc(input_desc)
+
+    embeddings = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, -1))(embed_desc)
+    bidir_layers = tf.keras.layers.Bidirectional(
+        tf.keras.layers.GRU(64, activation='relu', return_sequences=True))(embeddings)
+
+    x = tf.keras.layers.Dense(64, activation='relu')(bidir_layers)
+
+    rating_layer = tf.keras.layers.Dense(64, activation='relu')(input_rating)
     rating_layer = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, 0))(rating_layer)
     x = tf.keras.layers.concatenate([x, rating_layer])
     outputs = keras.layers.Dense(1)(x)
-    model = keras.Model(inputs=[input_title, input_desc, rating_inp], outputs=outputs)
+
+    model = keras.Model(inputs=[input_desc, input_rating], outputs=outputs)
 
     # Tune the learning rate for the optimizer
     # Choose an optimal value from 0.01, 0.001, or 0.0001
-    hp_learning_rate = hp.get('learning_rate')
 
     model.compile(
-        optimizer=keras.optimizers.Adam(learning_rate=hp_learning_rate),
+        optimizer=keras.optimizers.Adam(learning_rate=0.01),
         loss=tf.keras.losses.MeanAbsoluteError(),
         metrics=[keras.metrics.MeanSquaredError()])
 

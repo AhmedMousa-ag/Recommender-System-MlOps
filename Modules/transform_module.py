@@ -15,13 +15,22 @@ def preprocessing_fn(inputs):
     """
     outputs = {}
     for key in _STRING_FEATURE:
-        outputs[key] = inputs[key]  # Return it as it's, our embedding model will handle it,
+        #print(key)
+        #print(f"We want this line: {inputs[key]}")
+        #_ = tft.vocabulary(inputs[key], vocab_filename=_STRING_FEATURE[0])
+        outputs[key] = tft.compute_and_apply_vocabulary(
+            _fill_in_missing(inputs[key]),top_k=50,num_oov_buckets=128)
+        #outputs[key] = tf.cast(inputs[key],dtype=tf.uint64) #tft.vocabulary(inputs[key], vocab_filename=inputs[key])
+
         # and it must be passed in outputs to be passed to the model
+       # print(f"look for this line: {outputs[key]}, {inputs[key]}")
 
     for key in _FLOAT_FEATURE:
         # If sparse make it dense, setting nan's to 0 or '', and apply zscore.
+        #outputs[key] = inputs[key] / 10
         outputs[key] = tft.scale_to_z_score(
-            _fill_in_missing(inputs[key])) / 10  # scalling the rating as the maximum value is 10
+            _fill_in_missing(inputs[key]))
+
     return outputs
 
 
