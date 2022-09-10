@@ -9,7 +9,8 @@ pipline:
   name: 'rec_sys_imdb'
 
 train_args:
-  epochs: 50
+  epochs: 100000
+  steps: 100
   label_key: 'My Rate'
   features_key:
     - "IMDb_Rating"
@@ -19,6 +20,6 @@ train_args:
   FLOAT_FEATURE:
     - "IMDb_Rating"
     - "My Rate"
-  early_stp_patience: 10
+  early_stp_patience: 500
 
 

@@ -8,9 +8,14 @@ from tfx.v1.types.standard_artifacts import HyperParameters
 from tfx.v1 import proto
 import tensorflow_model_analysis as tfma
 
+
+def load_config_file():
+    with open("config.yaml", "r") as fw:
+        config_file = yaml.safe_load(fw)
+    return config_file
+
+config_file = load_config_file()
 _LABEL_KEY = 'My Rate'
-
-
 def create_pipline(pipeline_name, pipeline_root, data_root,
                    serving_model_dir, metadata_path,
                    _train_module_file, _transform_module_file, _tuner_module_file=None, first_time_tuning=True,
@@ -75,27 +80,29 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
             eval_args=trainer_pb2.EvalArgs(splits=['eval'], num_steps=5))
         components.append(tuner)
 
+        steps = config_file["train_args"]["steps"]
         trainer = tfx.components.Trainer(
             module_file=_train_module_file,
             examples=transform.outputs['transformed_examples'],
             transform_graph=transform.outputs['transform_graph'],
             hyperparameters=tuner.outputs['best_hyperparameters'],
             schema=schema_gen.outputs['schema'],
-            train_args=trainer_pb2.TrainArgs(splits=['train'], num_steps=20),
-            eval_args=trainer_pb2.EvalArgs(splits=['eval'], num_steps=5))
+            train_args=trainer_pb2.TrainArgs(num_steps=steps),
+            eval_args=trainer_pb2.EvalArgs(num_steps=int(steps/2)))
         components.append(trainer)
     else:
         hparams_importer = Importer(source_uri=path_to_tuner_best_hyp,
                                     artifact_type=HyperParameters)
 
+        steps = config_file["train_args"]["steps"]
         trainer = tfx.components.Trainer(
             module_file=_train_module_file,
             examples=transform.outputs['transformed_examples'],
             transform_graph=transform.outputs['transform_graph'],
             hyperparameters=hparams_importer.outputs['result'],  # It refuses it because it's not type Channel
             schema=schema_gen.outputs['schema'],
-            train_args=trainer_pb2.TrainArgs(num_steps=100),
-            eval_args=trainer_pb2.EvalArgs(num_steps=5))
+            train_args=trainer_pb2.TrainArgs(num_steps=steps),
+            eval_args=trainer_pb2.EvalArgs(num_steps=int(steps / 2)))
         components.append(trainer)
 
     # --------------------------------This part is for model evaluation and model analysis--------------------
@@ -146,7 +153,4 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
         components=components)
 
 
-def load_config_file():
-    with open("config.yaml", "r") as fw:
-        config_file = yaml.safe_load(fw)
-    return config_file
+

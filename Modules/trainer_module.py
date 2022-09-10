@@ -6,11 +6,14 @@ import tensorflow_hub as hub
 from tfx import v1 as tfx
 from Utils.utils import load_config_file
 import tensorflow_transform as tft
+
 config_file = load_config_file()
 
 _LABEL_KEY = config_file["train_args"]["label_key"]
 _TRAIN_BATCH_SIZE = 20
 _EVAL_BATCH_SIZE = 10
+
+epochs = config_file["train_args"]["epochs"]
 
 
 def _gzip_reader_fn(filenames):
@@ -29,7 +32,7 @@ def _gzip_reader_fn(filenames):
 
 def _input_fn(file_pattern,
               tf_transform_output,
-              num_epochs=None,
+              num_epochs=epochs,
               batch_size=32) -> tf.data.Dataset:
     '''Create batches of features and labels from TF Records
 
@@ -56,19 +59,6 @@ def _input_fn(file_pattern,
         label_key=_LABEL_KEY)
 
     return dataset
-
-
-def _build_uni_embedding(uri="https://tfhub.dev/google/universal-sentence-encoder/4"):
-    return hub.KerasLayer(uri, trainable=False)
-
-
-"""
-The model will consist of:
-    1- Embedding layer for each string future, *- And an input layer for
-    2- A Bidirectional layer for each Embedding
-    3- A concatenate for the Bidirectional layers and the IMDB rating Dense Layer
-    4- an Output layer of 1 neuron with a linear activation function 
-"""
 
 
 def _build_keras_model(hp) -> tf.keras.Model:
@@ -127,12 +117,13 @@ def run_fn(fn_args: tfx.components.FnArgs):
     tensorboard_callback = tf.keras.callbacks.TensorBoard(
         log_dir=fn_args.model_run_dir, update_freq='batch')
     patience = config_file["train_args"]["early_stp_patience"]
-    early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience)
+    early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience,
+                                                           restore_best_weght=True)
 
     tf_transform_output = tft.TFTransformOutput(fn_args.transform_graph_path)
 
     # Use _input_fn() to extract input features and labels from the train and val set
-    epochs = config_file["train_args"]["epochs"] # Define our epochs here
+    epochs = config_file["train_args"]["epochs"]  # Define our epochs here
     train_dataset = _input_fn(fn_args.train_files[0], tf_transform_output, epochs)
     eval_dataset = _input_fn(fn_args.eval_files[0], tf_transform_output, epochs)
 
@@ -140,6 +131,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
     model = _build_keras_model(hp=hp)
     model.fit(
         train_dataset,
+        epochs=epochs,
         steps_per_epoch=fn_args.train_steps,
         validation_data=eval_dataset,
         validation_steps=fn_args.eval_steps,

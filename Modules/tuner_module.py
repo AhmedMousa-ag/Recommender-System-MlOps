@@ -72,8 +72,6 @@ def _input_fn(file_pattern,
 
 
 # -----------------------------------------------------------------------------------------
-def _build_uni_embedding(uri="https://tfhub.dev/google/universal-sentence-encoder/4"):
-    return hub.KerasLayer(uri, trainable=False)
 
 
 def model_builder(hp):
