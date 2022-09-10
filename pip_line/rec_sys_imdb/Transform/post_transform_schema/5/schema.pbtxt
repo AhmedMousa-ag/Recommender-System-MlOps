@@ -14,7 +14,7 @@ feature {
   }
 }
 feature {
-  name: "IMDb Rating"
+  name: "IMDb_Rating"
   type: FLOAT
   presence {
     min_fraction: 1.0
