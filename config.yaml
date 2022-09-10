@@ -4,8 +4,21 @@ directories:
   prep_data: "Data/Prep-Data"
   modules: "Modules"
   serving_model: "Model_Serving"
-  tun_best_param: "Tuner/best_hyperparameters/827/best_hyperparameters.txt"
+  tun_best_param: "Tuner/best_hyperparameters/best_hyperparameters.txt"
 pipline:
   name: 'rec_sys_imdb'
+
+train_args:
+  epochs: 50
+  label_key: 'My Rate'
+  features_key:
+    - "IMDb_Rating"
+    - "Description"
+  STRING_FEATURE:
+    - "Description"
+  FLOAT_FEATURE:
+    - "IMDb_Rating"
+    - "My Rate"
+  early_stp_patience: 10
 
 

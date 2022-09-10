@@ -7,6 +7,8 @@ import tensorflow_transform as tft
 from keras_tuner.engine import base_tuner
 from tensorflow import keras
 from tfx.components.trainer.fn_args_utils import FnArgs
+from Utils.utils import load_config_file
+config_file = load_config_file()
 
 TunerFnResult = NamedTuple('TunerFnResult', [('tuner', base_tuner.BaseTuner),
                                              ('fit_kwargs', Dict[Text, Any])])
@@ -85,8 +87,6 @@ def model_builder(hp):
       model with hyperparameters to tune
     """
 
-    _FEATURE_KEYS = [
-        'Description', 'IMDb Rating']
     # Tune the number of units in the first Dense layer
     # Choose an optimal value between 32-512
 

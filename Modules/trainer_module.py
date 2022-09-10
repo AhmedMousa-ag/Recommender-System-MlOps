@@ -4,11 +4,11 @@ import tensorflow as tf
 from tensorflow import keras
 import tensorflow_hub as hub
 from tfx import v1 as tfx
-from tfx_bsl.public import tfxio
-from tensorflow_metadata.proto.v0 import schema_pb2
+from Utils.utils import load_config_file
 import tensorflow_transform as tft
+config_file = load_config_file()
 
-_LABEL_KEY = 'My Rate'  # TODO make it in config file
+_LABEL_KEY = config_file["train_args"]["label_key"]
 _TRAIN_BATCH_SIZE = 20
 _EVAL_BATCH_SIZE = 10
 
@@ -126,13 +126,13 @@ def run_fn(fn_args: tfx.components.FnArgs):
 
     tensorboard_callback = tf.keras.callbacks.TensorBoard(
         log_dir=fn_args.model_run_dir, update_freq='batch')
-
-    early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
+    patience = config_file["train_args"]["early_stp_patience"]
+    early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience)
 
     tf_transform_output = tft.TFTransformOutput(fn_args.transform_graph_path)
 
     # Use _input_fn() to extract input features and labels from the train and val set
-    epochs = 50  # Define our epochs here #TODO move it to config file
+    epochs = config_file["train_args"]["epochs"] # Define our epochs here
     train_dataset = _input_fn(fn_args.train_files[0], tf_transform_output, epochs)
     eval_dataset = _input_fn(fn_args.eval_files[0], tf_transform_output, epochs)
 

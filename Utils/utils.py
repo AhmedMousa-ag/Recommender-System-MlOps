@@ -3,7 +3,7 @@ from tfx import v1 as tfx  # It's a bit tricky but you have to import tfx from v
 from tfx.components import CsvExampleGen, StatisticsGen
 from tfx.dsl.components.common.importer import Importer
 from tfx.proto import example_gen_pb2, trainer_pb2
-
+import yaml
 from tfx.v1.types.standard_artifacts import HyperParameters
 from tfx.v1 import proto
 import tensorflow_model_analysis as tfma
@@ -85,18 +85,14 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
             eval_args=trainer_pb2.EvalArgs(splits=['eval'], num_steps=5))
         components.append(trainer)
     else:
-        hparams_importer = Importer(
-            # This can be Tuner's output file or manually edited file. The file contains
-            # text format of hyperparameters (keras_tuner.HyperParameters.get_config())
-            source_uri=path_to_tuner_best_hyp,
-            artifact_type=HyperParameters,
-        ).with_id('import_hparams')
+        hparams_importer = Importer(source_uri=path_to_tuner_best_hyp,
+                                    artifact_type=HyperParameters)
 
         trainer = tfx.components.Trainer(
             module_file=_train_module_file,
             examples=transform.outputs['transformed_examples'],
             transform_graph=transform.outputs['transform_graph'],
-            hyperparameters=hparams_importer.outputs['result'],
+            hyperparameters=hparams_importer.outputs['result'],  # It refuses it because it's not type Channel
             schema=schema_gen.outputs['schema'],
             train_args=trainer_pb2.TrainArgs(num_steps=100),
             eval_args=trainer_pb2.EvalArgs(num_steps=5))
@@ -148,3 +144,9 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
         metadata_connection_config=tfx.orchestration.metadata
         .sqlite_metadata_connection_config(metadata_path),
         components=components)
+
+
+def load_config_file():
+    with open("config.yaml", "r") as fw:
+        config_file = yaml.safe_load(fw)
+    return config_file
