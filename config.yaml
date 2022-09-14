@@ -9,7 +9,7 @@ pipline:
   name: 'rec_sys_imdb'
 
 train_args:
-  epochs: 100000
+  epochs: 1 #100000
   steps: 100
   label_key: 'My Rate'
   features_key:

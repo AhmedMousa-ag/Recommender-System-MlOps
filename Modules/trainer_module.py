@@ -71,15 +71,19 @@ def _build_keras_model(hp) -> tf.keras.Model:
     activations_choices = hp.get("activation")
     hp_learning_rate = hp.get("learning_rate")
 
-    input_desc = keras.layers.Input(shape=[1, ], dtype=tf.float32,
+    input_desc = keras.layers.Input(shape=[1, ], dtype=tf.string,
                                     name="Description")  # Input layer names must be the same as the feature names
 
     input_rating = keras.layers.Input(shape=[1, ], dtype=tf.float32,
                                       name='IMDb_Rating')  # Input layer names must be the same as the feature names
+    squeezed = keras.layers.Lambda(lambda x: tf.squeeze(x))(input_desc)
+    embed_desc = hub.KerasLayer("https://tfhub.dev/google/universal-sentence-encoder/4", trainable=False)
+    embed_desc = embed_desc(squeezed)
+    # keras.layers.Embedding(input_dim=6000, output_dim=124, mask_zero=True)(input_desc)
+    expanded_layer = keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=-1))(embed_desc)
 
-    embed_desc = keras.layers.Embedding(input_dim=6000, output_dim=124, mask_zero=True)(input_desc)
     bidir_layers = tf.keras.layers.Bidirectional(
-        tf.keras.layers.GRU(hp_units, activation=activations_choices, return_sequences=True))(embed_desc)
+        tf.keras.layers.GRU(hp_units, activation=activations_choices, return_sequences=True))(expanded_layer)
 
     x = tf.keras.layers.Dense(64, activation=activations_choices)(bidir_layers)
     x = tf.keras.layers.Flatten()(x)
@@ -118,7 +122,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
         log_dir=fn_args.model_run_dir, update_freq='batch')
     patience = config_file["train_args"]["early_stp_patience"]
     early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=patience,
-                                                           restore_best_weght=True)
+                                                           restore_best_weights=True)
 
     tf_transform_output = tft.TFTransformOutput(fn_args.transform_graph_path)
 

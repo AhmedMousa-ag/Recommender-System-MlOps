@@ -8,6 +8,7 @@ from keras_tuner.engine import base_tuner
 from tensorflow import keras
 from tfx.components.trainer.fn_args_utils import FnArgs
 from Utils.utils import load_config_file
+
 config_file = load_config_file()
 
 TunerFnResult = NamedTuple('TunerFnResult', [('tuner', base_tuner.BaseTuner),
@@ -91,15 +92,18 @@ def model_builder(hp):
     hp_units = hp.Int('units', min_value=32, max_value=512, step=32)
     activations_choices = hp.Choice('activation', values=['relu', 'selu'])
 
-    input_desc = keras.layers.Input(shape=[1, ], dtype=tf.float32,
+    input_desc = keras.layers.Input(shape=[1, ], dtype=tf.string,
                                     name="Description")  # Input layer names must be the same as the feature names
 
     input_rating = keras.layers.Input(shape=[1, ], dtype=tf.float32,
                                       name='IMDb_Rating')  # Input layer names must be the same as the feature names
+    squeezed = keras.layers.Lambda(lambda x: tf.squeeze(x))(input_desc)
+    embed_desc = hub.KerasLayer("https://tfhub.dev/google/universal-sentence-encoder/4", trainable=False)
+    embed_desc = embed_desc(squeezed)
 
-    embed_desc = keras.layers.Embedding(input_dim=6000, output_dim=124, mask_zero=True)(input_desc)
+    expanded_layer = keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=-1))(embed_desc)
     bidir_layers = tf.keras.layers.Bidirectional(
-        tf.keras.layers.GRU(hp_units, activation=activations_choices, return_sequences=True))(embed_desc)
+        tf.keras.layers.GRU(hp_units, activation=activations_choices, return_sequences=True))(expanded_layer)
 
     x = tf.keras.layers.Dense(64, activation=activations_choices)(bidir_layers)
     x = tf.keras.layers.Flatten()(x)

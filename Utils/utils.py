@@ -9,13 +9,31 @@ from tfx.v1 import proto
 import tensorflow_model_analysis as tfma
 
 
-def load_config_file():
-    with open("config.yaml", "r") as fw:
+def load_config_file(path="config.yaml"):
+    """This function load our config yaml file
+    Args:
+        path to our configuration file, it assumes by default that's in the same working directory // Change if it's else where.
+    :returns configle file to that looks where
+    """
+    with open(path, "r") as fw:
         config_file = yaml.safe_load(fw)
     return config_file
 
+
+def write_to_yaml(write_file, path="config.yaml"):
+    """ It writes dynamically our specified configuration to our config file
+    Args:
+        write_file: the configuration you want to write into our config file
+        path: path to our configuration file, it assumes by default that's in the same working directory // Change if it's else where.
+    """
+    with open(path, "w") as fw:
+        yaml.dump(write_file, fw)
+
+
 config_file = load_config_file()
 _LABEL_KEY = 'My Rate'
+
+
 def create_pipline(pipeline_name, pipeline_root, data_root,
                    serving_model_dir, metadata_path,
                    _train_module_file, _transform_module_file, _tuner_module_file=None, first_time_tuning=True,
@@ -88,7 +106,7 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
             hyperparameters=tuner.outputs['best_hyperparameters'],
             schema=schema_gen.outputs['schema'],
             train_args=trainer_pb2.TrainArgs(num_steps=steps),
-            eval_args=trainer_pb2.EvalArgs(num_steps=int(steps/2)))
+            eval_args=trainer_pb2.EvalArgs(num_steps=int(steps / 2)))
         components.append(trainer)
     else:
         hparams_importer = Importer(source_uri=path_to_tuner_best_hyp,
@@ -106,17 +124,8 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
         components.append(trainer)
 
     # --------------------------------This part is for model evaluation and model analysis--------------------
-    # NEW: Get the latest blessed model for Evaluator.
-    model_resolver = tfx.dsl.Resolver(
-        strategy_class=tfx.dsl.experimental.LatestBlessedModelStrategy,
-        model=tfx.dsl.Channel(type=tfx.types.standard_artifacts.Model),
-        model_blessing=tfx.dsl.Channel(
-            type=tfx.types.standard_artifacts.ModelBlessing)).with_id(
-        'latest_blessed_model_resolver')
 
-    # NEW: Uses TFMA to compute evaluation statistics over features of a model and
     #   perform quality validation of a candidate model (compared to a baseline).
-
     eval_config = tfma.EvalConfig(
         model_specs=[tfma.ModelSpec(label_key=_LABEL_KEY)],
         # signature_name='eval',
@@ -126,20 +135,25 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
             # Calculate metrics for each penguin species.
             tfma.SlicingSpec(feature_keys=[_LABEL_KEY]),
         ],
-
     )
-
+    # -------------------------------------
+    model_resolver = tfx.dsl.Resolver(
+        strategy_class=tfx.dsl.experimental.LatestBlessedModelStrategy,
+        model=tfx.dsl.Channel(type=tfx.types.standard_artifacts.Model),
+        model_blessing=tfx.dsl.Channel(type=tfx.types.standard_artifacts.ModelBlessing)
+    ).with_id('latest_blessed_model_resolver')
+    # -------------------------------------
     evaluator = tfx.components.Evaluator(
         examples=transform.outputs['transformed_examples'],
         model=trainer.outputs['model'],
-        # baseline_model=model_resolver.outputs['model'],
+        schema=schema_gen.outputs['schema'],
+        # baseline_model=model_resolver.outputs['model'], # Un-comment only if you are using model blessing
         eval_config=eval_config)
     components.append(evaluator)
-
     # ------------------------------------End of model evaluation and model analysis-------------------------------
     pusher = tfx.components.Pusher(
         model=trainer.outputs['model'],
-        model_blessing=evaluator.outputs['blessing'],
+        # model_blessing=evaluator.outputs['blessing'], # Un-comment only if you are using model blessing
         push_destination=tfx.proto.PushDestination(
             filesystem=tfx.proto.PushDestination.Filesystem(
                 base_directory=serving_model_dir)))
@@ -151,6 +165,3 @@ def create_pipline(pipeline_name, pipeline_root, data_root,
         metadata_connection_config=tfx.orchestration.metadata
         .sqlite_metadata_connection_config(metadata_path),
         components=components)
-
-
-
