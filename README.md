@@ -11,13 +11,13 @@ Used pretrained tf_hub universal embedding to preprocess string feature "Descrip
 
 
 # How repo works
-Runing main file will run all process "No jupyter, only .py file".
+*- Runing main file will run all process "No jupyter, only .py file".
 
-Utils folder where we define our pipleine components and having a few other functions to help in our journey.
+*- Utils folder where we define our pipleine components and having a few other functions to help in our journey.
 
-We can explore our data inside jupyter notebook with statistics gen inside our Data folder.
+*- We can explore our data inside jupyter notebook with statistics gen inside our Data folder.
 
-Piple line using transform, tuning and training modules which can be find inside Modules folder.
+*- Piple line using transform, tuning and training modules which can be find inside Modules folder.
 
-Config file where we can define training hyperparameters and other required locations.
+*- Config file where we can define training hyperparameters and other required locations.
 
