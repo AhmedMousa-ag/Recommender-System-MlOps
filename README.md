@@ -1,5 +1,5 @@
 # Recommender-System-MlOps
-Using software practice to initiate Recommender system for what to watch next using IMDb data and my personal watchlist to predict my personal rating.
+Using software practice to initiate TFX pipeline Recommender system for what to watch next using IMDb data and my personal watchlist to predict my personal rating.
 
 Used feature: 1- Movie description
 
